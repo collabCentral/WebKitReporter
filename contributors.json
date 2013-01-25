@@ -1,0 +1,37 @@
+{
+    "contributors": [
+        {
+            "name": "Vivek Galatage",
+            "shortname": "vivek",
+            "ircnick": "vivekg",
+            "role": "committer",
+            "status": "active"
+        },
+        {
+            "name": "Pravin D",
+            "shortname": "pravin",
+            "ircnick": "pravind",
+            "role": "committer",
+            "status": "active"
+        },
+        {
+            "name": "Arpita Bahuguna",
+            "shortname": "arpita",
+            "ircnick": "arpitab",
+            "role": "committer",
+            "status": "active"
+        },
+        {
+            "name": "Samarth Deo",
+            "shortname": "dsam2912"
+        },
+        {
+            "name": "Rahul Tiwari",
+            "shortname": "rahultiwari"
+        },
+        {
+            "name": "Sankeerth V S",
+            "shortname": "sankeerth"
+        }
+    ]
+}

@@ -1,4 +1,0 @@
-WebKitReporter
-==============
-
-WebKit Reporter
