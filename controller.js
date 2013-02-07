@@ -97,7 +97,6 @@ org.controller.Controller.prototype = {
             var textData = bugs[b].innerHTML.replace(/\n/g,' ');
             var start = textData.indexOf(bugString);
             var index = start + bugString.length;
-            var textData = bugs[b].textContent.replace(/\n/g,' ');
             var c = textData.charAt(index);
             var bugId = "";
             while(c !== ' ') {
