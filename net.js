@@ -8,10 +8,16 @@ NetworkRequest = function(url, callback)
 
 org.net.NetworkManager = function()
 {
-    this._xhr = new XMLHttpRequest();
     this._requestQueue = [];
     this._busy = false;
     this._currentRequest = null;
+    this._cacheManager = new org.net.CacheManager();
+    this._cacheManager.addEventListener(org.net.CacheManager.Events.CachedResponse, this._onResponse.bind(this));
+}
+
+org.net.NetworkManager.Priority = {
+    High: 0,
+    Normal: 1
 }
 
 org.net.NetworkManager.prototype = {
@@ -22,23 +28,65 @@ org.net.NetworkManager.prototype = {
 
         this._busy = true;
         this._currentRequest = this._requestQueue.splice(0, 1)[0];
-        this._xhr.onreadystatechange = this._onResponse.bind(this);
-        this._xhr.open("GET", this._currentRequest.url, true);
-        this._xhr.send();
+        this._cacheManager.request(this._currentRequest.url);
     },
 
-    _onResponse: function()
+    _onResponse: function(event)
     {
-        if (this._xhr.readyState === 4 && this._xhr.status == 200) {
-            this._busy = false;
-            this._currentRequest.callback(this._xhr.responseText);
-            setTimeout(this._processRequest.bind(this), 0);
+        this._busy = false;
+        this._currentRequest.callback(event.data);
+        setTimeout(this._processRequest.bind(this), 0);
+    },
+
+    request: function(url, callback, priority)
+    {
+        if (typeof priority === "undefined")
+            priority = org.net.NetworkManager.Priority.Normal;
+
+        if (priority === org.net.NetworkManager.Priority.High)
+            this._requestQueue.unshift(new NetworkRequest(url, callback));
+        else
+            this._requestQueue.push(new NetworkRequest(url, callback));
+
+        setTimeout(this._processRequest.bind(this), 0);
+    }
+}
+
+org.net.CacheManager = function()
+{
+    org.base.Notifier.call(this);
+    this._xhr = new XMLHttpRequest();
+}
+
+org.net.CacheManager.Events = {
+    CachedResponse: "CachedResponse"
+}
+
+org.net.CacheManager.prototype = {
+    __proto__: org.base.Notifier.prototype,
+
+    request: function(url)
+    {
+        var cachedResponse = (url.search("xsl") !== -1 || url.search("json") !== -1) ? null : localStorage.getItem(url);
+        if (!cachedResponse) {
+            this._xhr.onreadystatechange = this._onXHRResponse.bind(this);
+            this._xhr.url = url;
+            this._xhr.open("GET", url, true);
+            this._xhr.send();
+        } else {
+            function fireEvent()
+            {
+                this.dispatchEventToListeners(org.net.CacheManager.Events.CachedResponse, cachedResponse);
+            }
+            setTimeout(fireEvent.bind(this), 0);
         }
     },
 
-    request: function(url, callback) 
+    _onXHRResponse: function()
     {
-        this._requestQueue.push(new NetworkRequest(url, callback));
-        this._processRequest();
+        if (this._xhr.readyState === 4 && this._xhr.status == 200) {
+            localStorage.setItem(this._xhr.url, this._xhr.responseText);
+            this.dispatchEventToListeners(org.net.CacheManager.Events.CachedResponse, this._xhr.responseText);
+        }
     }
 }
