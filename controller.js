@@ -1,23 +1,27 @@
 package("org.controller");
 
 const CONTRIBUTORS_JSON = "contributors.json";
+const BUG_TRANSFORMER_XSL = "bugTransformer.xsl";
 const TRAC_URL = "http://trac.webkit.org/search?changeset=on&q={0}+show_bug.cgi%3Fid%3D&page={1}&noquickjump=1";
 const BUGZILLA_URL = "https://bugs.webkit.org/show_bug.cgi?ctype=xml&excludefield=attachmentdata&{0}";
 
 org.controller.Controller = function(model)
 {
+    org.base.Notifier.call(this);
     this._model = model;
     this._networkManager = new org.net.NetworkManager();
-    this._events = {};
 }
 
 org.controller.Events = {
     ContributorsReceived: "ContributorsReceived",
     TracDataReceived: "TracDataReceived",
-    BugzillaDataReceived: "BugzillaDataReceived"
+    BugzillaDataReceived: "BugzillaDataReceived",
+    BugDataTransformed: "BugDataTransformed"
 }
 
 org.controller.Controller.prototype = {
+    __proto__: org.base.Notifier.prototype,
+
     requestContributors: function() 
     {
         this._networkManager.request(CONTRIBUTORS_JSON, this._onContributorsReceived.bind(this));
@@ -90,7 +94,8 @@ org.controller.Controller.prototype = {
         var bugs = df.querySelectorAll("dd.searchable");
         var bugIds = [];
         for (var b = 0; b < bugs.length; ++b) {
-            var start = bugs[b].innerText.indexOf(bugString);
+            var textData = bugs[b].innerHTML.replace(/\n/g,' ');
+            var start = textData.indexOf(bugString);
             var index = start + bugString.length;
             var textData = bugs[b].textContent.replace(/\n/g,' ');
             var c = textData.charAt(index);
@@ -119,38 +124,35 @@ org.controller.Controller.prototype = {
     {
         for (var i = 0; i < contributors.length; ++i) {
             var bugUrl = "id=" + contributors[i].bugIds.join("&id=");
-            this._networkManager.request(BUGZILLA_URL.format(bugUrl), this._onBugzillaDataReceived.bind(this));
+            var contributor = contributors[i];
+            this._networkManager.request(BUGZILLA_URL.format(bugUrl), this._onBugzillaDataReceived.bind(this, contributor));
         }
     },
 
-    _onBugzillaDataReceived: function(xml)
+    _onBugzillaDataReceived: function(contributor, xml)
     {
+        xml = xml.replace(/(\r\n|\n|\r)/g,"");
+        xml = xml.replace(/<bugzilla/g, "<bugzilla contributor=\"" + contributor.name + "\"");
         this.dispatchEventToListeners(org.controller.Events.BugzillaDataReceived, xml);
     },
-
-    addEventListener: function(eventName, callback) {
-        if (!this._events[eventName]) {
-            this._events[eventName] = {};
-            this._events[eventName].name = eventName;
-            this._events[eventName].callbacks = [];
-        }
-
-        this._events[eventName].callbacks.push(callback);
+    
+    transformBugData: function(xml)
+    {
+        if (!this._xsl)
+            this._networkManager.request(BUG_TRANSFORMER_XSL, this._onXslReceived.bind(this, xml), org.net.NetworkManager.Priority.High);
+        else
+            this._onXslReceived(xml, this._xsl);
     },
+     
+    _onXslReceived: function(xml, xslSheet)
+    {
+        this._xsl = xslSheet;
+        var proc = new XSLTProcessor();
+        xslDoc = new DOMParser().parseFromString(xslSheet, "text/xml");
+        proc.importStylesheet(xslDoc);
 
-    dispatchEventToListeners: function(eventName, data) {
-        var event = this._events[eventName];
-        if (!event)
-            return;
-        
-        var eventData = {}
-        eventData.name = eventName;
-        eventData.data = data;
-
-        for (var i = 0, l = event.callbacks.length; i < l; ++i) {
-            var f = function(eventData) { this(eventData); }
-            setTimeout(f.bind(event.callbacks[i], eventData), 0);
-        }
-    },
-
+        xmlDom = new DOMParser().parseFromString(xml, "text/xml");
+        var xslt = proc.transformToFragment(xmlDom, document);
+        this.dispatchEventToListeners(org.controller.Events.BugDataTransformed, xslt);
+    }
 }
