@@ -6,6 +6,7 @@ org.model.ModelClass = function()
     this.controller.addEventListener(org.controller.Events.ContributorsReceived, this._onContributorsReceived.bind(this));
     this.controller.addEventListener(org.controller.Events.TracDataReceived, this._onTracDataReceived.bind(this));
     this.controller.addEventListener(org.controller.Events.BugzillaDataReceived, this._onBugzillaDataReceived.bind(this));
+    this.controller.addEventListener(org.controller.Events.BugDataTransformed, this._onBugDataTransformed.bind(this));
     this.controller.requestContributors();
 }
 
@@ -22,10 +23,12 @@ org.model.ModelClass.prototype = {
 
     _onBugzillaDataReceived: function(event)
     {
-        if (!this.me)
-            document.documentElement.innerHTML = event.data;
-        else
-            document.documentElement.innerHTML += event.data;
+        this.controller.transformBugData(event.data);
+    },
+
+    _onBugDataTransformed: function(event)
+    {
+        document.body.appendChild(event.data);
     }
 }
 
